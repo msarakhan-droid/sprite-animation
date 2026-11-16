@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Завдання 4 — Спрайти та анімація</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}*{box-sizing:border-box}body{margin:0;background:#101827;color:#f8fafc;display:flex;justify-content:center;padding:24px}main{width:min(900px,100%)}h1{margin:0 0 8px;font-size:clamp(23px,4vw,34px)}p{color:#cbd5e1;line-height:1.5}.panel{background:#1e293b;border:1px solid #475569;border-radius:16px;padding:18px;margin-top:18px}.controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px}button{border:1px solid #64748b;border-radius:10px;padding:11px 16px;background:#334155;color:white;font-size:16px;cursor:pointer}button[aria-pressed=true]{background:#0e7490;border-color:#67e8f9}button:focus-visible,input:focus-visible{outline:3px solid #fbbf24}label{display:flex;align-items:center;gap:12px;margin:12px 0}input[type=range]{width:min(260px,45vw)}canvas{display:block;width:100%;height:auto;background:linear-gradient(#162d4b,#244567);border-radius:12px;border:1px solid #64748b}small{color:#cbd5e1}#status{font-weight:700;color:#67e8f9}.stats{display:flex;gap:20px;flex-wrap:wrap;margin:12px 0}
+</style></head><body><main><h1>Завдання 4 — Спрайти, анімація та UI</h1><p>Самодостатня демонстрація трьох анімацій персонажа. Натискай <b>1</b> — стояти, <b>2</b> — крокувати, <b>3</b> — бігти. Перемикай напрямок кнопкою Flip та змінюй масштаб.</p><div class="panel"><div class="controls"><button data-mode="idle" aria-pressed="true">1 — Стояти</button><button data-mode="walk" aria-pressed="false">2 — Крокувати</button><button data-mode="run" aria-pressed="false">3 — Бігти</button><button id="flip">↔ Flip</button></div><label for="scale">Масштаб: <input id="scale" type="range" min="60" max="180" value="100" step="10"><output id="scaleOut">100%</output></label><label for="hitbox"><input id="hitbox" type="checkbox" checked> Показувати hitbox</label><div class="stats"><span>Стан: <strong id="status">Стояти</strong></span><span>FPS: <strong id="fps">6</strong></span><span>Кадр: <strong id="frame">1</strong> / 6</span></div><canvas id="scene" width="800" height="450" role="img" aria-label="Анімований персонаж із рамкою зіткнення"></canvas><p><small>Hitbox — пунктирна прямокутна область, яка охоплює персонажа; розміри змінюються відповідно до анімації та масштабу. Графіка намальована програмно в Canvas без зовнішніх ресурсів.</small></p></div></main>
+<script>
+'use strict';
+const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
+const modes={idle:{label:'Стояти',fps:6,frames:6,box:[76,156]},walk:{label:'Крокувати',fps:11,frames:8,box:[92,156]},run:{label:'Бігти',fps:15,frames:8,box:[112,151]}};
+let mode='idle',scale=1,flipped=false,showHitbox=true,frame=0,last=0,acc=0;
+const $=id=>document.getElementById(id);
+function setMode(next){if(!modes[next])return;mode=next;frame=0;acc=0;last=0;document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===next)));$('status').textContent=modes[next].label;$('fps').textContent=modes[next].fps;$('frame').textContent=1+' / '+modes[next].frames;}
+document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
+$('flip').addEventListener('click',()=>{flipped=!flipped;$('flip').setAttribute('aria-pressed',String(flipped));});
+$('scale').addEventListener('input',e=>{scale=Number(e.target.value)/100;$('scaleOut').textContent=e.target.value+'%';});
+$('hitbox').addEventListener('change',e=>showHitbox=e.target.checked);
+document.addEventListener('keydown',e=>{if(e.altKey||e.ctrlKey||e.metaKey||['INPUT','TEXTAREA'].includes(document.activeElement.tagName))return;const map={'1':'idle','2':'walk','3':'run'};if(map[e.key])setMode(map[e.key]);});
+function line(x1,y1,x2,y2,w,color){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle=color;ctx.lineWidth=w;ctx.lineCap='round';ctx.stroke();}
+function ellipse(x,y,rx,ry,color){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();}
+function render(t){const dt=last?Math.min(t-last,70):0;last=t;acc+=dt;const data=modes[mode],interval=1000/data.fps;while(acc>=interval){frame=(frame+1)%data.frames;acc-=interval;}$('frame').textContent=(frame+1)+' / '+data.frames;
+ctx.clearRect(0,0,800,450);ctx.fillStyle='#2d5a56';ctx.fillRect(0,355,800,95);ctx.fillStyle='#6c9a6a';ctx.fillRect(0,352,800,7);for(let i=0;i<800;i+=64){ctx.fillStyle='#355f59';ctx.fillRect(i,382+(i%3)*12,29,3)}
+const phase=frame/data.frames*Math.PI*2,amp=mode==='idle'?0:mode==='walk'?0.46:0.77,bob=mode==='idle'?Math.sin(phase)*2:Math.abs(Math.sin(phase))*6;
+ctx.save();ctx.translate(400,351);ctx.scale((flipped?-1:1)*scale,scale);ctx.translate(0,-bob);
+ellipse(0,bob+2,55,9,'#0e2931aa');
+// Arms and legs use distinct poses for each animation frame.
+const legSwing=Math.sin(phase)*amp,armSwing=Math.sin(phase)*amp*0.85;
+const hipY=-72,shoulderY=-128;
+line(-13,hipY,-14+legSwing*27,-39,16,'#1e3a8a');line(-14+legSwing*27,-39,-16+legSwing*42,-7,14,'#1d4ed8');
+line(13,hipY,14-legSwing*27,-39,16,'#1e3a8a');line(14-legSwing*27,-39,16-legSwing*42,-7,14,'#2563eb');
+line(-16+legSwing*42,-7,-2+legSwing*42,-7,10,'#0f172a');line(16-legSwing*42,-7,30-legSwing*42,-7,10,'#0f172a');
+line(-24,shoulderY,-32-armSwing*23,-96,13,'#f3b37c');line(-32-armSwing*23,-96,-30-armSwing*34,-72,12,'#f3b37c');
+line(24,shoulderY,32+armSwing*23,-96,13,'#f3b37c');line(32+armSwing*23,-96,30+armSwing*34,-72,12,'#f3b37c');
+ctx.fillStyle='#06b6d4';ctx.beginPath();ctx.moveTo(-25,-141);ctx.lineTo(25,-141);ctx.lineTo(20,-75);ctx.lineTo(-20,-75);ctx.closePath();ctx.fill();ctx.fillStyle='#0891b2';ctx.fillRect(-20,-81,40,7);
+ellipse(0,-163,22,24,'#f3b37c');ctx.fillStyle='#172554';ctx.beginPath();ctx.arc(0,-169,22,Math.PI,Math.PI*2);ctx.lineTo(22,-163);ctx.lineTo(-22,-163);ctx.fill();ellipse(8,-164,2.6,3,'#0f172a');
+if(showHitbox){const [w,h]=data.box;ctx.strokeStyle='#fbbf24';ctx.lineWidth=2.5;ctx.setLineDash([7,5]);ctx.strokeRect(-w/2,-h-10,w,h+12);ctx.setLineDash([]);ctx.fillStyle='#fbbf24';ctx.font='bold 12px system-ui';ctx.fillText('HITBOX',-w/2,-h-18);}
+ctx.restore();requestAnimationFrame(render);}requestAnimationFrame(render);
+</script></body></html>
